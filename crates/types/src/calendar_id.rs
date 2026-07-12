@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 /// Unique identifier for a calendar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct CalendarId(pub(crate) crate::Id);
 
 impl CalendarId {
