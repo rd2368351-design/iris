@@ -1,6 +1,7 @@
 //! Email-related shared types.
 
 pub mod address;
+pub mod attachment;
 pub mod body;
 pub mod envelope;
 pub mod header;
@@ -9,6 +10,7 @@ pub mod message;
 pub mod message_id;
 
 pub use address::EmailAddress;
+pub use attachment::Attachment;
 pub use body::Body;
 pub use envelope::Envelope;
 pub use header::Header;
