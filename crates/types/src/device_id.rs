@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 /// Unique identifier for a registered user device.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct DeviceId(pub(crate) crate::Id);
 
 impl DeviceId {
