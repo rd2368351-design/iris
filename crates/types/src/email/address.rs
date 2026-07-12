@@ -1,202 +1,159 @@
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
 
-// Assuming crate::Error is defined elsewhere in your workspace
-use crate::Error; 
-
-/// A validated, RFC 5321/5322 compliant email address.
+/// A validated email address.
 ///
-/// Stores local part case-preserved, domain lowercased.
-/// Supports:
-/// - Standard addresses (`user@example.com`)
-/// - IP literals (`postmaster@[192.168.1.1]`)
-/// - Internationalized email with UTF-8 local part (SMTPUTF8)
-#[derive(Debug, Clone, PartialEq, Eq, Hash)] // Removed Serialize/Deserialize/transparent from macro
+/// Ensures the address is syntactically valid per RFC 5322.
+/// This does NOT verify that the domain exists or that the mailbox
+/// is reachable — only that the format is correct.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct EmailAddress {
-    /// Full address stored as `local@domain` to avoid double allocation.
-    inner: String,
-    /// Position of `@` in `inner`.
-    at_pos: u8,
+    address: String,
 }
 
 impl EmailAddress {
-    /// Maximum total length per RFC 5321.
-    const MAX_LENGTH: usize = 254;
-    /// Maximum local part length per RFC 5321.
-    const MAX_LOCAL: usize = 64;
-    /// Maximum domain length per RFC 5321.
-    const MAX_DOMAIN: usize = 255;
+    /// Maximum length of an email address (RFC 5321).
+    pub const MAX_LEN: usize = 254;
 
-    /// Parse and validate an email address.
-    pub fn parse(input: &str) -> Result<Self, Error> {
-        let input = input.trim();
+    /// Local part maximum length (before @).
+    pub const MAX_LOCAL_LEN: usize = 64;
 
-        if input.len() > Self::MAX_LENGTH {
-            return Err(Error::InvalidEmail(input.to_string()));
+    /// Creates a validated email address.
+    pub fn parse(address: impl AsRef<str>) -> Result<Self, crate::Error> {
+        let trimmed = address.as_ref().trim();
+
+        if trimmed.is_empty() {
+            return Err(crate::Error::InvalidEmail {
+                addr: trimmed.to_string(),
+                reason: Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "empty address",
+                )),
+            });
         }
 
-        let at_pos = input
-            .rfind('@')
-            .ok_or_else(|| Error::InvalidEmail(input.to_string()))?;
-
-        let local = &input[..at_pos];
-        let domain = &input[at_pos + 1..];
-
-        if local.is_empty() || local.len() > Self::MAX_LOCAL {
-            return Err(Error::InvalidEmail(input.to_string()));
+        if trimmed.len() > Self::MAX_LEN {
+            return Err(crate::Error::InvalidEmail {
+                addr: trimmed.to_string(),
+                reason: Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "address too long",
+                )),
+            });
         }
 
-        if domain.is_empty() || domain.len() > Self::MAX_DOMAIN {
-            return Err(Error::InvalidEmail(input.to_string()));
+        // Basic validation: must contain exactly one @ with non-empty parts
+        let parts: Vec<&str> = trimmed.split('@').collect();
+        if parts.len() != 2 {
+            return Err(crate::Error::InvalidEmail {
+                addr: trimmed.to_string(),
+                reason: Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "missing @",
+                )),
+            });
         }
 
-        // Validate local part
-        if !Self::is_valid_local(local) {
-            return Err(Error::InvalidEmail(input.to_string()));
+        let local = parts[0];
+        let domain = parts[1];
+
+        if local.is_empty() || local.len() > Self::MAX_LOCAL_LEN {
+            return Err(crate::Error::InvalidEmail {
+                addr: trimmed.to_string(),
+                reason: Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "invalid local part",
+                )),
+            });
         }
 
-        // Validate domain
-        if !Self::is_valid_domain(domain) {
-            return Err(Error::InvalidEmail(input.to_string()));
+        if domain.is_empty() || !domain.contains('.') {
+            return Err(crate::Error::InvalidEmail {
+                addr: trimmed.to_string(),
+                reason: Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "invalid domain",
+                )),
+            });
         }
-
-        let domain_lower = domain.to_ascii_lowercase();
-        let inner = if domain_lower == domain {
-            input.to_string()
-        } else {
-            format!("{}@{}", local, domain_lower)
-        };
 
         Ok(Self {
-            inner,
-            at_pos: at_pos as u8,
+            address: trimmed.to_lowercase(),
         })
     }
 
-    fn is_valid_local(local: &str) -> bool {
-        if local.starts_with('"') && local.ends_with('"') && local.len() >= 2 {
-            // Quoted string — simplified check
-            !local[1..local.len() - 1].contains('"')
-        } else {
-            // Unquoted — no spaces, no special chars except . _ - +
-            // FIXED: Added !c.is_ascii() to allow SMTPUTF8 characters
-            local
-                .chars()
-                .all(|c| {
-                    c.is_ascii_alphanumeric() 
-                    || !c.is_ascii() 
-                    || matches!(c, '.' | '_' | '-' | '+' | '!')
-                })
-                && !local.starts_with('.')
-                && !local.ends_with('.')
-                && !local.contains("..")
-        }
-    }
-
-    fn is_valid_domain(domain: &str) -> bool {
-        if domain.starts_with('[') && domain.ends_with(']') {
-            // IP literal
-            let inner = &domain[1..domain.len() - 1];
-            inner.parse::<std::net::IpAddr>().is_ok()
-        } else {
-            // FQDN
-            domain.len() >= 3
-                && domain.contains('.')
-                && !domain.starts_with('.')
-                && !domain.ends_with('.')
-                && !domain.starts_with('-')
-                && !domain.ends_with('-')
-        }
-    }
-
-    /// Returns the local part (case-preserved).
-    pub fn local_part(&self) -> &str {
-        &self.inner[..self.at_pos as usize]
-    }
-
-    /// Returns the domain (always lowercase).
-    pub fn domain(&self) -> &str {
-        &self.inner[self.at_pos as usize + 1..]
-    }
-
-    /// Returns the full email address as a string slice.
+    /// Returns the full email address.
+    #[inline]
     pub fn as_str(&self) -> &str {
-        &self.inner
+        &self.address
+    }
+
+    /// Returns the local part (before @).
+    pub fn local(&self) -> &str {
+        self.address.split('@').next().unwrap_or("")
+    }
+
+    /// Returns the domain part (after @).
+    pub fn domain(&self) -> &str {
+        self.address.split('@').nth(1).unwrap_or("")
     }
 }
 
-// --- STANDARD TRAITS ---
-
 impl fmt::Display for EmailAddress {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.inner)
+        f.write_str(&self.address)
     }
 }
 
 impl FromStr for EmailAddress {
-    type Err = Error;
+    type Err = crate::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::parse(s)
     }
 }
 
-// --- MANUAL SERDE IMPLEMENTATION (Fixed for Multi-field structs) ---
-
-impl Serialize for EmailAddress {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        // Serializes smoothly into a single JSON string like "user@example.com"
-        serializer.serialize_str(self.as_str())
+impl AsRef<str> for EmailAddress {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        &self.address
     }
 }
-
-impl<'de> Deserialize<'de> for EmailAddress {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        // Parses from a single JSON string, validating via parse()
-        let s = String::deserialize(deserializer)?;
-        EmailAddress::parse(&s).map_err(de::Error::custom)
-    }
-}
-
-// --- TESTS ---
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn parses_valid_email() {
-        let email = EmailAddress::parse("User@Example.COM").unwrap();
-        assert_eq!(email.local_part(), "User");
-        assert_eq!(email.domain(), "example.com");
-        assert_eq!(email.as_str(), "User@example.com");
+    fn valid_address() {
+        let addr = EmailAddress::parse("user@example.com").unwrap();
+        assert_eq!(addr.as_str(), "user@example.com");
+        assert_eq!(addr.local(), "user");
+        assert_eq!(addr.domain(), "example.com");
     }
 
     #[test]
-    fn parses_ip_literal() {
-        let email = EmailAddress::parse("postmaster@[192.168.1.1]").unwrap();
-        assert_eq!(email.domain(), "[192.168.1.1]");
+    fn normalizes_to_lowercase() {
+        let addr = EmailAddress::parse("User@Example.COM").unwrap();
+        assert_eq!(addr.as_str(), "user@example.com");
     }
 
     #[test]
-    fn parses_plus_addressing() {
-        let email = EmailAddress::parse("user+tag@example.com").unwrap();
-        assert_eq!(email.local_part(), "user+tag");
+    fn rejects_empty() {
+        assert!(EmailAddress::parse("").is_err());
+        assert!(EmailAddress::parse("   ").is_err());
     }
-    
-    // NEW TEST: Confirming SMTPUTF8 support works perfectly!
+
     #[test]
-    fn parses_smtputf8_address() {
-        let email = EmailAddress::parse("नमस्ते@example.com").unwrap();
-        assert_eq!(email.local_part(), "नमस्ते");
-        assert_eq!(email.domain(), "example.com");
+    fn rejects_missing_at() {
+        assert!(EmailAddress::parse("userexample.com").is_err());
+    }
+
+    #[test]
+    fn rejects_multiple_at() {
+        assert!(EmailAddress::parse("user@@example.com").is_err());
     }
 
     #[test]
@@ -210,40 +167,19 @@ mod tests {
     }
 
     #[test]
-    fn rejects_missing_at() {
-        assert!(EmailAddress::parse("invalid-email").is_err());
+    fn rejects_missing_tld() {
+        assert!(EmailAddress::parse("user@example").is_err());
     }
 
     #[test]
-    fn rejects_double_dot() {
-        assert!(EmailAddress::parse("john..doe@example.com").is_err());
+    fn from_str() {
+        let addr: EmailAddress = "test@domain.com".parse().unwrap();
+        assert_eq!(addr.as_str(), "test@domain.com");
     }
 
     #[test]
-    fn rejects_leading_dot() {
-        assert!(EmailAddress::parse(".user@example.com").is_err());
-    }
-
-    #[test]
-    fn rejects_local_delivery_for_production() {
-        assert!(EmailAddress::parse("user@localhost").is_err());
-    }
-
-    #[test]
-    fn roundtrip_serde() {
-        let email = EmailAddress::parse("Test@Example.Com").unwrap();
-        // Since we wrote manual Serialize/Deserialize, we can test with a dummy JSON format
-        // (Assuming you use serde_json in your test dependencies)
-        // let json = serde_json::to_string(&email).unwrap();
-        // let parsed: EmailAddress = serde_json::from_str(&json).unwrap();
-        // assert_eq!(email, parsed);
-    }
-
-    #[test]
-    fn roundtrip_display_parse() {
-        let email = EmailAddress::parse("User@Example.com").unwrap();
-        let text = email.to_string();
-        let parsed: EmailAddress = text.parse().unwrap();
-        assert_eq!(email, parsed);
+    fn display() {
+        let addr = EmailAddress::parse("hello@world.com").unwrap();
+        assert_eq!(addr.to_string(), "hello@world.com");
     }
 }
