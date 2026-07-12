@@ -1,5 +1,10 @@
 use thiserror::Error;
 
+/// Errors that can originate from the foundational `types` crate.
+///
+/// Higher-level crates (store, directory, smtp, ...) define their own
+/// error types and wrap this one with `#[from]` where relevant, rather
+/// than every crate in the workspace depending on one giant enum.
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("invalid id '{value}': {reason}")]
@@ -24,4 +29,10 @@ pub enum Error {
 
     #[error("invalid mailbox name")]
     InvalidMailboxName,
+
+    #[error("invalid header name: {0}")]
+    InvalidHeaderName(String),
+
+    #[error("invalid header value: {0}")]
+    InvalidHeaderValue(String),
 }
