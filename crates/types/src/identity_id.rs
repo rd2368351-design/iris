@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::str::FromStr;
 
 use crate::Id;
 
@@ -37,6 +38,14 @@ impl fmt::Display for IdentityId {
     }
 }
 
+impl FromStr for IdentityId {
+    type Err = crate::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(Id::from_str(s)?))
+    }
+}
+
 impl From<Id> for IdentityId {
     fn from(id: Id) -> Self {
         Self(id)
@@ -60,5 +69,13 @@ mod tests {
 
         assert_eq!(identity.id(), id);
         assert_eq!(identity.value(), 2025);
+    }
+
+    #[test]
+    fn roundtrip() {
+        let id = IdentityId::new(Id::new(12345));
+        let text = id.to_string();
+        let parsed: IdentityId = text.parse().unwrap();
+        assert_eq!(id, parsed);
     }
 }
