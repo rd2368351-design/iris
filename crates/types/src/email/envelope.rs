@@ -11,7 +11,6 @@ use super::EmailAddress;
 /// The envelope can have a `null` sender (represented as `None`),
 /// which is used for bounce messages and delivery status notifications.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(transparent)]
 pub struct Envelope {
     mail_from: Option<EmailAddress>,
     rcpt_to: Vec<EmailAddress>,
