@@ -3,15 +3,6 @@ members = [
     "crates/iris-types",
     "crates/iris-core",
     "crates/iris-crypto",
-    "crates/iris-auth",
-    "crates/iris-store",
-    "crates/iris-smtp",
-    "crates/iris-imap",
-    "crates/iris-jmap",
-    "crates/iris-spam",
-    "crates/iris-queue",
-    "crates/iris-admin",
-    "crates/iris-main",
 ]
 resolver = "2"
 
@@ -23,7 +14,6 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/rd2368351-design/iris"
 
 [workspace.dependencies]
-# Shared dependencies
 tokio = { version = "1.35", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
