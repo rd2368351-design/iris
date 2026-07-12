@@ -9,6 +9,7 @@ use crate::Id;
 /// A user owns one or more mailboxes, identities, sessions,
 /// application passwords, and other account-related resources.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct UserId(Id);
 
 impl UserId {
