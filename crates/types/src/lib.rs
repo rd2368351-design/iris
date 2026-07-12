@@ -31,6 +31,7 @@ pub mod permission_id;
 pub mod token_id;
 pub mod upload_id;
 pub mod notification_id;
+pub mod job_id;
 
 pub use error::Error;
 pub use id::Id;
@@ -59,3 +60,4 @@ pub use permission_id::PermissionId;
 pub use token_id::TokenId;
 pub use upload_id::UploadId;
 pub use notification_id::NotificationId;
+pub use job_id::JobId;
