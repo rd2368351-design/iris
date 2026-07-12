@@ -1,42 +1,35 @@
-# Iris
+# Mailbox — Enterprise Mail Server
 
-Mail server built from scratch in Rust — SMTP, IMAP, and JMAP support, built module by module. Architecture inspired by [Stalwart](https://github.com/stalwartlabs/stalwart).
+[![CI](https://github.com/mailbox/mailbox/actions/workflows/ci.yml/badge.svg)](https://github.com/mailbox/mailbox/actions)
+[![Go Report](https://goreportcard.com/badge/github.com/mailbox/mailbox)](https://goreportcard.com/report/github.com/mailbox/mailbox)
+[![License](https://img.shields.io/badge/license-AGPL%203.0-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](CHANGELOG.md)
 
-> **Status: early development.** The foundation layer (storage, config, auth) is being built first; protocol servers (SMTP/IMAP/JMAP) come after that's solid and tested.
+Mailbox is a complete, production-ready enterprise mail server written in Go.
+It supports SMTP, IMAP, JMAP, POP3, CalDAV, CardDAV, and ManageSieve protocols
+with multi-tenancy, clustering, and enterprise compliance features.
 
-## Why Iris
+## Features
 
-Most self-hosted mail servers are either decades-old and hard to extend (Postfix + Dovecot + a dozen glue scripts) or closed-source SaaS. Iris aims for a single, modern, modular codebase — one project you can actually read end to end.
+- **SMTP Server** — Inbound/outbound with DKIM, SPF, DMARC, DANE
+- **IMAP Server** — 30+ commands, IDLE, CONDSTORE, QRESYNC
+- **JMAP Server** — RFC 8620/8621 mail, calendar, contacts
+- **POP3 Server** — Legacy email retrieval
+- **CalDAV/CardDAV** — Calendar and contacts sync
+- **ManageSieve** — Server-side email filtering
+- **Multi-Tenant** — Isolated organizations
+- **Clustering** — Raft consensus, gossip, auto-failover
+- **Security** — Argon2id, JWT, OAuth2, SAML, LDAP
+- **Anti-Spam** — Bayesian, rules, DNSBL, greylisting
+- **Compliance** — GDPR, HIPAA, SOC2, retention, eDiscovery
+- **Observability** — Prometheus, OpenTelemetry, structured logging
 
-## Architecture
+## Quick Start
 
-Iris is a Cargo workspace. Each crate owns one responsibility, and crates only depend downward (never sideways or up):
-
-```
-crates/
-├── types       shared data types (Id, EmailAddress, ...) — no dependencies
-├── utils       small dependency-light helpers (codecs, time)
-├── common      config loading, tracing/telemetry setup
-├── store       pluggable storage (Store trait; SQLite backend first)
-├── directory   accounts, authentication
-└── main        binary entry point
-```
-
-More crates (`smtp`, `imap`, `jmap`, `spam-filter`, ...) get added as the project grows — see [Issues](../../issues) for the current roadmap.
-
-## Building
-
+### Docker
 ```bash
-cargo build
-cargo test
-```
-
-No external services required yet — the default storage backend is a local SQLite file (`./data/iris.db`).
-
-## License
-
-Iris is licensed under the [GNU Affero General Public License v3.0](LICENSE). In short: you're free to use, modify, and redistribute Iris, but if you run a modified version as a network service, you must make your modified source available to its users too.
-
-## Contributing
-
-Not yet accepting external contributions — the core architecture is still settling. Feel free to open an issue for bugs or ideas.
+docker run -d \
+  --name mailbox \
+  -p 25:25 -p 143:143 -p 443:443 -p 587:587 \
+  -v mailbox-data:/data \
+  mailbox/mailbox:latest
