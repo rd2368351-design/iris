@@ -6,7 +6,6 @@ use crate::Error;
 
 /// A single RFC 5322 email header.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(transparent)]
 pub struct Header {
     name: String,
     value: String,
