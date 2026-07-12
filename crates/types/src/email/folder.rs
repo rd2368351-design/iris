@@ -16,26 +16,30 @@ use std::fmt;
 /// Permissions, hierarchy, counters and synchronization metadata
 /// belong to higher-level crates.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)] // FIXED: Added transparent for single-field struct
 pub struct Folder {
     name: String,
 }
 
 impl Folder {
+    /// Maximum length for a folder name.
+    pub const MAX_LEN: usize = 255;
+
     /// Creates a validated folder.
-    pub fn new(name: impl Into<String>) -> Result<Self, crate::Error> {
-        let name = name.into();
-        let trimmed = name.trim();
+    pub fn new(name: impl AsRef<str>) -> Result<Self, crate::Error> {
+        let trimmed = name.as_ref().trim();
 
         if trimmed.is_empty() {
-            return Err(crate::Error::InvalidFolderName(name));
+            // Convert to String only for the error path
+            return Err(crate::Error::InvalidFolderName(name.as_ref().to_string()));
         }
 
-        if trimmed.len() > 255 {
-            return Err(crate::Error::InvalidFolderName(name));
+        if trimmed.len() > Self::MAX_LEN {
+            return Err(crate::Error::InvalidFolderName(name.as_ref().to_string()));
         }
 
         Ok(Self {
-            name: trimmed.to_owned(),
+            name: trimmed.to_string(), // FIXED: Only ONE allocation happens here!
         })
     }
 
@@ -43,6 +47,10 @@ impl Folder {
     pub fn name(&self) -> &str {
         &self.name
     }
+
+    // --- IMAP STANDARD FOLDER CHECKS ---
+    // eq_ignore_ascii_case is absolutely PERFECT here. IMAP strictly requires
+    // "INBOX" to be case-insensitive in almost all contexts.
 
     /// Returns true if this is the Inbox.
     pub fn is_inbox(&self) -> bool {
@@ -87,6 +95,7 @@ mod tests {
 
     #[test]
     fn create_folder() {
+        // Now extremely efficient with &str
         let folder = Folder::new("Inbox").unwrap();
         assert_eq!(folder.name(), "Inbox");
         assert!(folder.is_inbox());
@@ -102,5 +111,12 @@ mod tests {
         let folder = Folder::new("  Sent  ").unwrap();
         assert_eq!(folder.name(), "Sent");
         assert!(folder.is_sent());
+    }
+    
+    #[test]
+    fn case_insensitive_standard_folders() {
+        // IMAP requires INBOX to be treated case-insensitively.
+        let folder = Folder::new("iNbOx").unwrap();
+        assert!(folder.is_inbox());
     }
 }
