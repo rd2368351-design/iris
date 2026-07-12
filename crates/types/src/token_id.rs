@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 /// Unique identifier for an authentication token.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct TokenId(pub(crate) crate::Id);
 
 impl TokenId {
