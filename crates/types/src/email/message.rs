@@ -1,42 +1,29 @@
 use serde::{Deserialize, Serialize};
 use bitflags::bitflags;
 
-// Assuming these are defined elsewhere in your workspace
 use super::{EmailAddress, Header};
 use crate::{MailboxId, MessageId};
 
-// --- BITFLAGS FOR MESSAGE STATES ---
-
 bitflags! {
-    /// Represents standard IMAP/JMAP message system flags.
-    /// Uses a single `u32` (4 bytes) to store up to 32 different boolean states!
+    /// Standard IMAP/JMAP message system flags.
+    /// Packed into a single `u32` for memory efficiency.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-    #[serde(transparent)] // Yahan transparent ekdum perfectly kaam karega kyunki yeh secretly sirf ek u32 hai!
+    #[serde(transparent)]
     pub struct MessageFlags: u32 {
-        /// The message has been read (IMAP \Seen)
         const SEEN     = 1 << 0;
-        /// The message has been answered (IMAP \Answered)
         const ANSWERED = 1 << 1;
-        /// The message is marked as important/starred (IMAP \Flagged)
         const FLAGGED  = 1 << 2;
-        /// The message is marked for deletion (IMAP \Deleted)
         const DELETED  = 1 << 3;
-        /// The message has not completed composition (IMAP \Draft)
         const DRAFT    = 1 << 4;
-        /// The message recently arrived in this mailbox (IMAP \Recent)
         const RECENT   = 1 << 5;
     }
 }
 
-// --- MESSAGE ENTITY ---
-
 /// A stored email message.
 ///
-/// This type contains only the common metadata shared across the
-/// workspace. MIME parsing, attachments and body decoding belong in the
-/// `email` crate, not the `types` crate.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-// FIXED: Removed #[serde(transparent)] because this struct has multiple fields
+/// Contains metadata shared across the workspace. MIME parsing,
+/// attachments, and body decoding belong in the `email` crate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Message {
     id: MessageId,
     mailbox_id: MailboxId,
@@ -48,12 +35,11 @@ pub struct Message {
     subject: String,
     date: Option<i64>,
     headers: Vec<Header>,
-    
-    /// The current state/flags of the message
     flags: MessageFlags,
 }
 
 impl Message {
+    /// Creates a new message with the minimum required fields.
     pub fn new(
         id: MessageId,
         mailbox_id: MailboxId,
@@ -72,106 +58,197 @@ impl Message {
             subject: subject.into(),
             date: None,
             headers: Vec::new(),
-            // By default, a new message gets the RECENT flag, but is unread
-            flags: MessageFlags::RECENT, 
+            flags: MessageFlags::RECENT,
         }
     }
 
     // --- GETTERS ---
 
-    pub fn id(&self) -> MessageId { self.id }
-    pub fn mailbox_id(&self) -> MailboxId { self.mailbox_id }
-    pub fn from(&self) -> &EmailAddress { &self.from }
-    pub fn to(&self) -> &[EmailAddress] { &self.to }
-    pub fn cc(&self) -> &[EmailAddress] { &self.cc }
-    pub fn bcc(&self) -> &[EmailAddress] { &self.bcc }
-    pub fn reply_to(&self) -> Option<&EmailAddress> { self.reply_to.as_ref() }
-    pub fn subject(&self) -> &str { &self.subject }
-    pub fn date(&self) -> Option<i64> { self.date }
-    pub fn headers(&self) -> &[Header] { &self.headers }
-    pub fn flags(&self) -> MessageFlags { self.flags }
-
-    // --- SETTERS / MUTATORS ---
-
-    pub fn add_header(&mut self, header: Header) {
-        self.headers.push(header);
-    }
-    pub fn add_recipient(&mut self, addr: EmailAddress) {
-        self.to.push(addr);
-    }
-    pub fn add_cc(&mut self, addr: EmailAddress) {
-        self.cc.push(addr);
-    }
-    pub fn set_reply_to(&mut self, addr: EmailAddress) {
-        self.reply_to = Some(addr);
-    }
-    pub fn set_date(&mut self, timestamp: i64) {
-        self.date = Some(timestamp);
+    #[inline]
+    pub const fn id(&self) -> MessageId {
+        self.id
     }
 
-    // --- FLAG MANAGEMENT (NEW) ---
+    #[inline]
+    pub const fn mailbox_id(&self) -> MailboxId {
+        self.mailbox_id
+    }
 
-    pub fn add_flag(&mut self, flag: MessageFlags) {
-        self.flags.insert(flag);
+    #[inline]
+    pub fn from(&self) -> &EmailAddress {
+        &self.from
     }
-    
-    pub fn remove_flag(&mut self, flag: MessageFlags) {
-        self.flags.remove(flag);
+
+    #[inline]
+    pub fn to(&self) -> &[EmailAddress] {
+        &self.to
     }
-    
-    pub fn has_flag(&self, flag: MessageFlags) -> bool {
-        self.flags.contains(flag)
+
+    #[inline]
+    pub fn cc(&self) -> &[EmailAddress] {
+        &self.cc
+    }
+
+    #[inline]
+    pub fn bcc(&self) -> &[EmailAddress] {
+        &self.bcc
+    }
+
+    #[inline]
+    pub fn reply_to(&self) -> Option<&EmailAddress> {
+        self.reply_to.as_ref()
+    }
+
+    #[inline]
+    pub fn subject(&self) -> &str {
+        &self.subject
+    }
+
+    /// Returns the Unix timestamp (seconds) when available.
+    #[inline]
+    pub const fn date(&self) -> Option<i64> {
+        self.date
+    }
+
+    #[inline]
+    pub fn headers(&self) -> &[Header] {
+        &self.headers
+    }
+
+    #[inline]
+    pub const fn flags(&self) -> MessageFlags {
+        self.flags
+    }
+
+    // --- STATE CHECKERS ---
+
+    #[inline]
+    pub fn is_seen(&self) -> bool {
+        self.flags.contains(MessageFlags::SEEN)
+    }
+
+    #[inline]
+    pub fn is_draft(&self) -> bool {
+        self.flags.contains(MessageFlags::DRAFT)
+    }
+
+    #[inline]
+    pub fn is_deleted(&self) -> bool {
+        self.flags.contains(MessageFlags::DELETED)
+    }
+
+    #[inline]
+    pub fn is_recent(&self) -> bool {
+        self.flags.contains(MessageFlags::RECENT)
+    }
+
+    #[inline]
+    pub fn is_flagged(&self) -> bool {
+        self.flags.contains(MessageFlags::FLAGGED)
+    }
+
+    // --- SETTERS (Builder-style) ---
+
+    #[inline]
+    pub fn with_cc(mut self, cc: Vec<EmailAddress>) -> Self {
+        self.cc = cc;
+        self
+    }
+
+    #[inline]
+    pub fn with_bcc(mut self, bcc: Vec<EmailAddress>) -> Self {
+        self.bcc = bcc;
+        self
+    }
+
+    #[inline]
+    pub fn with_reply_to(mut self, reply_to: EmailAddress) -> Self {
+        self.reply_to = Some(reply_to);
+        self
+    }
+
+    #[inline]
+    pub fn with_date(mut self, date: i64) -> Self {
+        self.date = Some(date);
+        self
+    }
+
+    #[inline]
+    pub fn with_headers(mut self, headers: Vec<Header>) -> Self {
+        self.headers = headers;
+        self
+    }
+
+    // --- FLAG MUTATORS ---
+
+    #[inline]
+    pub fn set_seen(&mut self) {
+        self.flags.insert(MessageFlags::SEEN);
+    }
+
+    #[inline]
+    pub fn set_deleted(&mut self) {
+        self.flags.insert(MessageFlags::DELETED);
+    }
+
+    #[inline]
+    pub fn set_flagged(&mut self) {
+        self.flags.insert(MessageFlags::FLAGGED);
+    }
+
+    #[inline]
+    pub fn clear_recent(&mut self) {
+        self.flags.remove(MessageFlags::RECENT);
     }
 }
-
-// --- TESTS ---
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Id, MailboxId, MessageId};
 
     #[test]
-    fn creates_message_with_default_flags() {
-        let from = EmailAddress::parse("alice@example.com").unwrap();
-        let to = EmailAddress::parse("bob@example.com").unwrap();
-
-        let message = Message::new(
+    fn new_message() {
+        let msg = Message::new(
             MessageId::new(1),
-            MailboxId::from(Id::new(10)),
-            from,
-            vec![to],
+            MailboxId::new(10),
+            EmailAddress::parse("from@example.com").unwrap(),
+            vec![EmailAddress::parse("to@example.com").unwrap()],
             "Hello",
         );
-
-        assert_eq!(message.subject(), "Hello");
-        // Check that RECENT is set by default
-        assert!(message.has_flag(MessageFlags::RECENT));
-        // Check that SEEN is NOT set
-        assert!(!message.has_flag(MessageFlags::SEEN));
+        assert_eq!(msg.subject(), "Hello");
+        assert!(msg.is_recent());
+        assert!(!msg.is_seen());
     }
 
     #[test]
-    fn manages_flags_correctly() {
-        let from = EmailAddress::parse("alice@example.com").unwrap();
-        let to = EmailAddress::parse("bob@example.com").unwrap();
-
-        let mut message = Message::new(
-            MessageId::new(2),
-            MailboxId::from(Id::new(11)),
-            from,
-            vec![to],
-            "Urgent Meeting",
-        );
-
-        // Add FLAGGED and SEEN states
-        message.add_flag(MessageFlags::FLAGGED | MessageFlags::SEEN);
+    fn builder_pattern() {
+        let msg = Message::new(
+            MessageId::new(1),
+            MailboxId::new(1),
+            EmailAddress::parse("a@b.com").unwrap(),
+            vec![],
+            "Subject",
+        )
+        .with_cc(vec![EmailAddress::parse("cc@b.com").unwrap()])
+        .with_date(1_700_000_000);
         
-        assert!(message.has_flag(MessageFlags::FLAGGED));
-        assert!(message.has_flag(MessageFlags::SEEN));
+        assert_eq!(msg.cc().len(), 1);
+        assert_eq!(msg.date(), Some(1_700_000_000));
+    }
 
-        // Remove the RECENT state
-        message.remove_flag(MessageFlags::RECENT);
-        assert!(!message.has_flag(MessageFlags::RECENT));
+    #[test]
+    fn flag_operations() {
+        let mut msg = Message::new(
+            MessageId::new(1),
+            MailboxId::new(1),
+            EmailAddress::parse("a@b.com").unwrap(),
+            vec![],
+            "Test",
+        );
+        assert!(!msg.is_seen());
+        msg.set_seen();
+        assert!(msg.is_seen());
+        msg.clear_recent();
+        assert!(!msg.is_recent());
     }
 }
