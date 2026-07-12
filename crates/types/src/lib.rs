@@ -8,8 +8,10 @@ pub mod error;
 pub mod id;
 pub mod email;
 pub mod message_id;
+pub mod mailbox_id;
 
 pub use error::Error;
 pub use id::Id;
 pub use email::EmailAddress;
 pub use message_id::MessageId;
+pub use mailbox_id::MailboxId;
