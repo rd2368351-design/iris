@@ -24,6 +24,7 @@ pub mod device_id;
 pub mod api_key_id;
 pub mod calendar_id;
 pub mod contact_id;
+pub mod event_id;
 
 pub use error::Error;
 pub use id::Id;
@@ -45,3 +46,4 @@ pub use device_id::DeviceId;
 pub use api_key_id::ApiKeyId;
 pub use calendar_id::CalendarId;
 pub use contact_id::ContactId;
+pub use event_id::EventId;
