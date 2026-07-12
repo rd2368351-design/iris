@@ -9,6 +9,7 @@ pub mod header;
 pub mod mailbox;
 pub mod message;
 pub mod message_id;
+pub mod folder;
 
 pub use address::EmailAddress;
 pub use attachment::Attachment;
@@ -19,3 +20,4 @@ pub use header::Header;
 pub use mailbox::Mailbox;
 pub use message::Message;
 pub use message_id::MessageId;
+pub use folder::Folder;
