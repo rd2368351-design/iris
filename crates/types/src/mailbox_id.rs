@@ -5,24 +5,31 @@ use std::str::FromStr;
 use crate::Id;
 
 /// Strongly-typed identifier for a mailbox.
+///
+/// A mailbox is a container for messages (e.g., Inbox, Sent, Drafts).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct MailboxId(Id);
+pub struct MailboxId(pub(crate) Id);
 
 impl MailboxId {
-    /// Create a new mailbox identifier.
-    pub fn new(id: Id) -> Self {
-        Self(id)
+    #[inline]
+    pub const fn new(id: u64) -> Self {
+        Self(Id::new(id))
     }
 
-    /// Returns the wrapped generic identifier.
-    pub fn id(self) -> Id {
+    #[inline]
+    pub const fn id(self) -> Id {
         self.0
     }
 
-    /// Returns the raw numeric value.
-    pub fn value(self) -> u64 {
+    #[inline]
+    pub const fn value(self) -> u64 {
         self.0.value()
+    }
+
+    #[inline]
+    pub const fn is_zero(self) -> bool {
+        self.0.is_zero()
     }
 }
 
@@ -41,14 +48,23 @@ impl FromStr for MailboxId {
 }
 
 impl From<Id> for MailboxId {
+    #[inline]
     fn from(id: Id) -> Self {
         Self(id)
     }
 }
 
 impl From<MailboxId> for Id {
+    #[inline]
     fn from(id: MailboxId) -> Self {
         id.0
+    }
+}
+
+impl From<u64> for MailboxId {
+    #[inline]
+    fn from(value: u64) -> Self {
+        Self::new(value)
     }
 }
 
@@ -57,17 +73,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn wraps_generic_id() {
-        let id = Id::new(100);
-        let mailbox = MailboxId::new(id);
-
-        assert_eq!(mailbox.id(), id);
-        assert_eq!(mailbox.value(), 100);
-    }
-
-    #[test]
-    fn roundtrip() {
-        let id = MailboxId::new(Id::new(12345));
+    fn new_and_roundtrip() {
+        let id = MailboxId::new(10);
+        assert_eq!(id.value(), 10);
         let text = id.to_string();
         let parsed: MailboxId = text.parse().unwrap();
         assert_eq!(id, parsed);
