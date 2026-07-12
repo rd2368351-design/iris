@@ -1,26 +1,30 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use std::str::FromStr;
+// FromStr removed to avoid unused import warnings
 
 use crate::{Error, Id};
 
 /// Identifies a mailbox (Inbox, Sent, Trash, Archive, ...).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Mailbox {
-    #[serde(transparent)]
+    // Removed #[serde(transparent)] from the field
     id: Id,
     name: String,
 }
 
 impl Mailbox {
-    pub fn new(id: Id, name: impl Into<String>) -> Result<Self, Error> {
-        let name = name.into().trim().to_string();
+    /// Using impl AsRef<str> prevents the "Double Allocation" problem.
+    pub fn new(id: Id, name: impl AsRef<str>) -> Result<Self, Error> {
+        let trimmed_name = name.as_ref().trim();
 
-        if name.is_empty() {
+        if trimmed_name.is_empty() {
             return Err(Error::InvalidMailboxName);
         }
 
-        Ok(Self { id, name })
+        Ok(Self { 
+            id, 
+            name: trimmed_name.to_string() // Only allocated ONCE!
+        })
     }
 
     pub fn id(&self) -> Id {
@@ -31,14 +35,15 @@ impl Mailbox {
         &self.name
     }
 
-    pub fn rename(&mut self, name: impl Into<String>) -> Result<(), Error> {
-        let name = name.into().trim().to_string();
+    pub fn rename(&mut self, name: impl AsRef<str>) -> Result<(), Error> {
+        let trimmed_name = name.as_ref().trim();
 
-        if name.is_empty() {
+        if trimmed_name.is_empty() {
             return Err(Error::InvalidMailboxName);
         }
 
-        self.name = name;
+        // Overwrite the old string
+        self.name = trimmed_name.to_string();
         Ok(())
     }
 }
@@ -52,9 +57,11 @@ impl fmt::Display for Mailbox {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Id; // Ensure Id is accessible in tests
 
     #[test]
     fn creates_mailbox() {
+        // Testing with &str
         let mailbox = Mailbox::new(Id::new(1), "Inbox").unwrap();
 
         assert_eq!(mailbox.name(), "Inbox");
@@ -68,7 +75,8 @@ mod tests {
 
     #[test]
     fn trims_whitespace() {
-        let mailbox = Mailbox::new(Id::new(2), "  Sent  ").unwrap();
+        // Testing with String directly to ensure AsRef<str> handles it
+        let mailbox = Mailbox::new(Id::new(2), String::from("  Sent  ")).unwrap();
 
         assert_eq!(mailbox.name(), "Sent");
     }
