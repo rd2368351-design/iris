@@ -38,4 +38,7 @@ pub enum Error {
 
 #[error("invalid folder name: {0}")]
 InvalidFolderName(String),
+
+#[error("invalid label name: {0}")]
+InvalidLabelName(String),
 }
