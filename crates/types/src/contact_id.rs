@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 /// Unique identifier for a contact.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct ContactId(pub(crate) crate::Id);
 
 impl ContactId {
