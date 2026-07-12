@@ -6,6 +6,7 @@ use crate::Id;
 
 /// Strongly-typed identifier for a mailbox.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct MailboxId(Id);
 
 impl MailboxId {
