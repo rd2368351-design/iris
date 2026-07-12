@@ -6,6 +6,7 @@ use crate::Id;
 
 /// Strongly-typed identifier for an email thread (conversation).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct ThreadId(Id);
 
 impl ThreadId {
