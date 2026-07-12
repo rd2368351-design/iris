@@ -12,6 +12,7 @@ pub mod message_id;
 pub mod folder;
 pub mod label;
 pub mod priority;
+pub mod status;
 
 pub use address::EmailAddress;
 pub use attachment::Attachment;
@@ -25,3 +26,4 @@ pub use message_id::MessageId;
 pub use folder::Folder;
 pub use label::Label;
 pub use priority::Priority;
+pub use status::Status;
