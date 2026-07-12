@@ -2,18 +2,32 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
 
-/// Unique identifier for a notification.
+use crate::Id;
+
+/// Strongly-typed identifier for a push notification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct NotificationId(pub(crate) crate::Id);
+pub struct NotificationId(pub(crate) Id);
 
 impl NotificationId {
-    pub fn new(id: u64) -> Self {
-        Self(crate::Id::new(id))
+    #[inline]
+    pub const fn new(id: u64) -> Self {
+        Self(Id::new(id))
     }
 
-    pub fn value(&self) -> u64 {
+    #[inline]
+    pub const fn id(self) -> Id {
+        self.0
+    }
+
+    #[inline]
+    pub const fn value(self) -> u64 {
         self.0.value()
+    }
+
+    #[inline]
+    pub const fn is_zero(self) -> bool {
+        self.0.is_zero()
     }
 }
 
@@ -27,19 +41,28 @@ impl FromStr for NotificationId {
     type Err = crate::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self(crate::Id::from_str(s)?))
+        Ok(Self(Id::from_str(s)?))
     }
 }
 
-impl From<crate::Id> for NotificationId {
-    fn from(id: crate::Id) -> Self {
+impl From<Id> for NotificationId {
+    #[inline]
+    fn from(id: Id) -> Self {
         Self(id)
     }
 }
 
-impl From<NotificationId> for crate::Id {
+impl From<NotificationId> for Id {
+    #[inline]
     fn from(id: NotificationId) -> Self {
         id.0
+    }
+}
+
+impl From<u64> for NotificationId {
+    #[inline]
+    fn from(value: u64) -> Self {
+        Self::new(value)
     }
 }
 
@@ -48,8 +71,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn roundtrip() {
-        let id = NotificationId::new(12345);
+    fn new_and_roundtrip() {
+        let id = NotificationId::new(80);
+        assert_eq!(id.value(), 80);
         let text = id.to_string();
         let parsed: NotificationId = text.parse().unwrap();
         assert_eq!(id, parsed);
