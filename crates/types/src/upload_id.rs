@@ -2,18 +2,32 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
 
-/// Unique identifier for an uploaded object.
+use crate::Id;
+
+/// Strongly-typed identifier for a file upload.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct UploadId(pub(crate) crate::Id);
+pub struct UploadId(pub(crate) Id);
 
 impl UploadId {
-    pub fn new(id: u64) -> Self {
-        Self(crate::Id::new(id))
+    #[inline]
+    pub const fn new(id: u64) -> Self {
+        Self(Id::new(id))
     }
 
-    pub fn value(&self) -> u64 {
+    #[inline]
+    pub const fn id(self) -> Id {
+        self.0
+    }
+
+    #[inline]
+    pub const fn value(self) -> u64 {
         self.0.value()
+    }
+
+    #[inline]
+    pub const fn is_zero(self) -> bool {
+        self.0.is_zero()
     }
 }
 
@@ -27,19 +41,28 @@ impl FromStr for UploadId {
     type Err = crate::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self(crate::Id::from_str(s)?))
+        Ok(Self(Id::from_str(s)?))
     }
 }
 
-impl From<crate::Id> for UploadId {
-    fn from(id: crate::Id) -> Self {
+impl From<Id> for UploadId {
+    #[inline]
+    fn from(id: Id) -> Self {
         Self(id)
     }
 }
 
-impl From<UploadId> for crate::Id {
+impl From<UploadId> for Id {
+    #[inline]
     fn from(id: UploadId) -> Self {
         id.0
+    }
+}
+
+impl From<u64> for UploadId {
+    #[inline]
+    fn from(value: u64) -> Self {
+        Self::new(value)
     }
 }
 
@@ -48,8 +71,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn roundtrip() {
-        let id = UploadId::new(12345);
+    fn new_and_roundtrip() {
+        let id = UploadId::new(70);
+        assert_eq!(id.value(), 70);
         let text = id.to_string();
         let parsed: UploadId = text.parse().unwrap();
         assert_eq!(id, parsed);
