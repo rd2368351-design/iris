@@ -18,6 +18,7 @@ pub mod session_id;
 pub mod identity_id;
 pub mod tenant_id;
 pub mod queue_id;
+pub mod attachment_id;
 
 pub use error::Error;
 pub use id::Id;
@@ -33,3 +34,4 @@ pub use session_id::SessionId;
 pub use identity_id::IdentityId;
 pub use tenant_id::TenantId;
 pub use queue_id::QueueId;
+pub use attachment_id::AttachmentId;
