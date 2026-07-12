@@ -27,6 +27,7 @@ pub mod contact_id;
 pub mod event_id;
 pub mod group_id;
 pub mod role_id;
+pub mod permission_id;
 
 pub use error::Error;
 pub use id::Id;
@@ -51,3 +52,4 @@ pub use contact_id::ContactId;
 pub use event_id::EventId;
 pub use group_id::GroupId;
 pub use role_id::RoleId;
+pub use permission_id::PermissionId;
