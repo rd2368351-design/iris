@@ -9,6 +9,7 @@ use crate::Id;
 /// Sessions are created after successful authentication and are used
 /// across IMAP, SMTP AUTH, JMAP, WebDAV and the Admin API.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct SessionId(Id);
 
 impl SessionId {
