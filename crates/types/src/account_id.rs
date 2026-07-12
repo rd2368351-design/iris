@@ -5,24 +5,31 @@ use std::str::FromStr;
 use crate::Id;
 
 /// Strongly-typed identifier for a user account.
+///
+/// An account may contain multiple identities, mailboxes, and settings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct AccountId(Id);
+pub struct AccountId(pub(crate) Id);
 
 impl AccountId {
-    /// Create a new account identifier.
-    pub fn new(id: Id) -> Self {
-        Self(id)
+    #[inline]
+    pub const fn new(id: u64) -> Self {
+        Self(Id::new(id))
     }
 
-    /// Returns the wrapped generic identifier.
-    pub fn id(self) -> Id {
+    #[inline]
+    pub const fn id(self) -> Id {
         self.0
     }
 
-    /// Returns the raw numeric value.
-    pub fn value(self) -> u64 {
+    #[inline]
+    pub const fn value(self) -> u64 {
         self.0.value()
+    }
+
+    #[inline]
+    pub const fn is_zero(self) -> bool {
+        self.0.is_zero()
     }
 }
 
@@ -41,14 +48,23 @@ impl FromStr for AccountId {
 }
 
 impl From<Id> for AccountId {
+    #[inline]
     fn from(id: Id) -> Self {
         Self(id)
     }
 }
 
 impl From<AccountId> for Id {
+    #[inline]
     fn from(id: AccountId) -> Self {
         id.0
+    }
+}
+
+impl From<u64> for AccountId {
+    #[inline]
+    fn from(value: u64) -> Self {
+        Self::new(value)
     }
 }
 
@@ -57,19 +73,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn wraps_generic_id() {
-        let id = Id::new(7);
-        let account = AccountId::new(id);
-
-        assert_eq!(account.id(), id);
-        assert_eq!(account.value(), 7);
-    }
-
-    #[test]
-    fn roundtrip() {
-        let id = AccountId::new(Id::new(12345));
+    fn new_and_roundtrip() {
+        let id = AccountId::new(1);
+        assert_eq!(id.value(), 1);
         let text = id.to_string();
         let parsed: AccountId = text.parse().unwrap();
         assert_eq!(id, parsed);
+    }
+
+    #[test]
+    fn from_u64() {
+        let id: AccountId = 42.into();
+        assert_eq!(id.value(), 42);
     }
 }
