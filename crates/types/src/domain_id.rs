@@ -11,6 +11,7 @@ use crate::Id;
 /// - company.org
 /// - mail.example.net
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct DomainId(Id);
 
 impl DomainId {
