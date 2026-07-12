@@ -4,32 +4,33 @@ use std::str::FromStr;
 
 use crate::Id;
 
-/// Strongly-typed identifier for a sender identity.
+/// Strongly-typed identifier for a sending identity.
 ///
-/// An identity represents a "From" address that a user can send mail
-/// from, such as:
-///
-/// - support@example.com
-/// - sales@example.com
-/// - jane@example.org
+/// An identity represents an email address + display name
+/// that a user can send mail from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct IdentityId(Id);
+pub struct IdentityId(pub(crate) Id);
 
 impl IdentityId {
-    /// Creates a new identity identifier.
-    pub fn new(id: Id) -> Self {
-        Self(id)
+    #[inline]
+    pub const fn new(id: u64) -> Self {
+        Self(Id::new(id))
     }
 
-    /// Returns the wrapped generic identifier.
-    pub fn id(self) -> Id {
+    #[inline]
+    pub const fn id(self) -> Id {
         self.0
     }
 
-    /// Returns the raw numeric value.
-    pub fn value(self) -> u64 {
+    #[inline]
+    pub const fn value(self) -> u64 {
         self.0.value()
+    }
+
+    #[inline]
+    pub const fn is_zero(self) -> bool {
+        self.0.is_zero()
     }
 }
 
@@ -48,14 +49,23 @@ impl FromStr for IdentityId {
 }
 
 impl From<Id> for IdentityId {
+    #[inline]
     fn from(id: Id) -> Self {
         Self(id)
     }
 }
 
 impl From<IdentityId> for Id {
+    #[inline]
     fn from(id: IdentityId) -> Self {
         id.0
+    }
+}
+
+impl From<u64> for IdentityId {
+    #[inline]
+    fn from(value: u64) -> Self {
+        Self::new(value)
     }
 }
 
@@ -64,17 +74,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn wraps_generic_id() {
-        let id = Id::new(2025);
-        let identity = IdentityId::new(id);
-
-        assert_eq!(identity.id(), id);
-        assert_eq!(identity.value(), 2025);
-    }
-
-    #[test]
-    fn roundtrip() {
-        let id = IdentityId::new(Id::new(12345));
+    fn new_and_roundtrip() {
+        let id = IdentityId::new(20);
+        assert_eq!(id.value(), 20);
         let text = id.to_string();
         let parsed: IdentityId = text.parse().unwrap();
         assert_eq!(id, parsed);
