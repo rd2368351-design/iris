@@ -20,6 +20,7 @@ pub mod tenant_id;
 pub mod queue_id;
 pub mod attachment_id;
 pub mod folder_id;
+pub mod device_id;
 
 pub use error::Error;
 pub use id::Id;
@@ -37,3 +38,4 @@ pub use tenant_id::TenantId;
 pub use queue_id::QueueId;
 pub use attachment_id::AttachmentId;
 pub use folder_id::FolderId;
+pub use device_id::DeviceId;
