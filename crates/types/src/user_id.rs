@@ -10,22 +10,31 @@ use crate::Id;
 /// application passwords, and other account-related resources.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct UserId(Id);
+pub struct UserId(pub(crate) Id);
 
 impl UserId {
-    /// Creates a new user identifier.
-    pub fn new(id: Id) -> Self {
-        Self(id)
+    /// Creates a new user identifier from a raw `u64`.
+    #[inline]
+    pub const fn new(id: u64) -> Self {
+        Self(Id::new(id))
     }
 
     /// Returns the wrapped generic identifier.
-    pub fn id(self) -> Id {
+    #[inline]
+    pub const fn id(self) -> Id {
         self.0
     }
 
     /// Returns the raw numeric value.
-    pub fn value(self) -> u64 {
+    #[inline]
+    pub const fn value(self) -> u64 {
         self.0.value()
+    }
+
+    /// Returns true if this is the zero/invalid ID.
+    #[inline]
+    pub const fn is_zero(self) -> bool {
+        self.0.is_zero()
     }
 }
 
@@ -44,14 +53,23 @@ impl FromStr for UserId {
 }
 
 impl From<Id> for UserId {
+    #[inline]
     fn from(id: Id) -> Self {
         Self(id)
     }
 }
 
 impl From<UserId> for Id {
+    #[inline]
     fn from(id: UserId) -> Self {
         id.0
+    }
+}
+
+impl From<u64> for UserId {
+    #[inline]
+    fn from(value: u64) -> Self {
+        Self::new(value)
     }
 }
 
@@ -60,19 +78,44 @@ mod tests {
     use super::*;
 
     #[test]
-    fn wraps_generic_id() {
-        let id = Id::new(42);
-        let user = UserId::new(id);
+    fn new_and_value() {
+        let id = UserId::new(42);
+        assert_eq!(id.value(), 42);
+        assert_eq!(id.id(), Id::new(42));
+        assert!(!id.is_zero());
+    }
 
-        assert_eq!(user.id(), id);
-        assert_eq!(user.value(), 42);
+    #[test]
+    fn from_id() {
+        let inner = Id::new(100);
+        let user = UserId::from(inner);
+        assert_eq!(user.value(), 100);
+    }
+
+    #[test]
+    fn into_id() {
+        let user = UserId::new(200);
+        let inner: Id = user.into();
+        assert_eq!(inner.value(), 200);
+    }
+
+    #[test]
+    fn from_u64() {
+        let user: UserId = 300.into();
+        assert_eq!(user.value(), 300);
     }
 
     #[test]
     fn roundtrip() {
-        let id = UserId::new(Id::new(12345));
+        let id = UserId::new(12345);
         let text = id.to_string();
         let parsed: UserId = text.parse().unwrap();
         assert_eq!(id, parsed);
+    }
+
+    #[test]
+    fn invalid_parse() {
+        assert!("abc".parse::<UserId>().is_err());
+        assert!("".parse::<UserId>().is_err());
     }
 }
