@@ -2,18 +2,32 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
 
-/// Unique identifier for a user group.
+use crate::Id;
+
+/// Strongly-typed identifier for a user group/mailing list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct GroupId(pub(crate) crate::Id);
+pub struct GroupId(pub(crate) Id);
 
 impl GroupId {
-    pub fn new(id: u64) -> Self {
-        Self(crate::Id::new(id))
+    #[inline]
+    pub const fn new(id: u64) -> Self {
+        Self(Id::new(id))
     }
 
-    pub fn value(&self) -> u64 {
+    #[inline]
+    pub const fn id(self) -> Id {
+        self.0
+    }
+
+    #[inline]
+    pub const fn value(self) -> u64 {
         self.0.value()
+    }
+
+    #[inline]
+    pub const fn is_zero(self) -> bool {
+        self.0.is_zero()
     }
 }
 
@@ -27,19 +41,28 @@ impl FromStr for GroupId {
     type Err = crate::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self(crate::Id::from_str(s)?))
+        Ok(Self(Id::from_str(s)?))
     }
 }
 
-impl From<crate::Id> for GroupId {
-    fn from(id: crate::Id) -> Self {
+impl From<Id> for GroupId {
+    #[inline]
+    fn from(id: Id) -> Self {
         Self(id)
     }
 }
 
-impl From<GroupId> for crate::Id {
+impl From<GroupId> for Id {
+    #[inline]
     fn from(id: GroupId) -> Self {
         id.0
+    }
+}
+
+impl From<u64> for GroupId {
+    #[inline]
+    fn from(value: u64) -> Self {
+        Self::new(value)
     }
 }
 
@@ -48,8 +71,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn roundtrip() {
-        let id = GroupId::new(12345);
+    fn new_and_roundtrip() {
+        let id = GroupId::new(44);
+        assert_eq!(id.value(), 44);
         let text = id.to_string();
         let parsed: GroupId = text.parse().unwrap();
         assert_eq!(id, parsed);
