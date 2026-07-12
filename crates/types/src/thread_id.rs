@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::str::FromStr;
 
 use crate::Id;
 
@@ -30,6 +31,14 @@ impl fmt::Display for ThreadId {
     }
 }
 
+impl FromStr for ThreadId {
+    type Err = crate::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(Id::from_str(s)?))
+    }
+}
+
 impl From<Id> for ThreadId {
     fn from(id: Id) -> Self {
         Self(id)
@@ -53,5 +62,13 @@ mod tests {
 
         assert_eq!(thread.id(), id);
         assert_eq!(thread.value(), 500);
+    }
+
+    #[test]
+    fn roundtrip() {
+        let id = ThreadId::new(Id::new(12345));
+        let text = id.to_string();
+        let parsed: ThreadId = text.parse().unwrap();
+        assert_eq!(id, parsed);
     }
 }
