@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 /// Unique identifier for a tenant (organization/workspace).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct TenantId(pub(crate) crate::Id);
 
 impl TenantId {
