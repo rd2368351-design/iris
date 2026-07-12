@@ -13,6 +13,7 @@ use crate::Id;
 /// - sales@example.com
 /// - jane@example.org
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct IdentityId(Id);
 
 impl IdentityId {
