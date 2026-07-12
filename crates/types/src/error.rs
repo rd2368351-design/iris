@@ -35,4 +35,7 @@ pub enum Error {
 
     #[error("invalid header value: {0}")]
     InvalidHeaderValue(String),
+
+#[error("invalid folder name: {0}")]
+InvalidFolderName(String),
 }
