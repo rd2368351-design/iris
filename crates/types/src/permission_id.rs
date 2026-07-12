@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 /// Unique identifier for a permission.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct PermissionId(pub(crate) crate::Id);
 
 impl PermissionId {
