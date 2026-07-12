@@ -10,6 +10,7 @@ pub mod email;
 pub mod message_id;
 pub mod mailbox_id;
 pub mod account_id;
+pub mod thread_id;
 
 pub use error::Error;
 pub use id::Id;
@@ -17,3 +18,4 @@ pub use email::EmailAddress;
 pub use message_id::MessageId;
 pub use mailbox_id::MailboxId;
 pub use account_id::AccountId;
+pub use thread_id::ThreadId;
