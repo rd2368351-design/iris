@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 /// Unique identifier for a mail queue entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct QueueId(pub(crate) crate::Id);
 
 impl QueueId {
