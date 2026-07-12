@@ -9,6 +9,7 @@ use crate::Id;
 /// Blobs represent attachment data, message bodies, thumbnails,
 /// S/MIME certificates, and other binary content stored by the mail server.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct BlobId(Id);
 
 impl BlobId {
