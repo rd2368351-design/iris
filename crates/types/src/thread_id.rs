@@ -4,25 +4,32 @@ use std::str::FromStr;
 
 use crate::Id;
 
-/// Strongly-typed identifier for an email thread (conversation).
+/// Strongly-typed identifier for a conversation thread.
+///
+/// Groups related messages together across mailboxes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct ThreadId(Id);
+pub struct ThreadId(pub(crate) Id);
 
 impl ThreadId {
-    /// Create a new thread identifier.
-    pub fn new(id: Id) -> Self {
-        Self(id)
+    #[inline]
+    pub const fn new(id: u64) -> Self {
+        Self(Id::new(id))
     }
 
-    /// Returns the wrapped generic identifier.
-    pub fn id(self) -> Id {
+    #[inline]
+    pub const fn id(self) -> Id {
         self.0
     }
 
-    /// Returns the raw numeric value.
-    pub fn value(self) -> u64 {
+    #[inline]
+    pub const fn value(self) -> u64 {
         self.0.value()
+    }
+
+    #[inline]
+    pub const fn is_zero(self) -> bool {
+        self.0.is_zero()
     }
 }
 
@@ -41,14 +48,23 @@ impl FromStr for ThreadId {
 }
 
 impl From<Id> for ThreadId {
+    #[inline]
     fn from(id: Id) -> Self {
         Self(id)
     }
 }
 
 impl From<ThreadId> for Id {
+    #[inline]
     fn from(id: ThreadId) -> Self {
         id.0
+    }
+}
+
+impl From<u64> for ThreadId {
+    #[inline]
+    fn from(value: u64) -> Self {
+        Self::new(value)
     }
 }
 
@@ -57,17 +73,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn wraps_generic_id() {
-        let id = Id::new(500);
-        let thread = ThreadId::new(id);
-
-        assert_eq!(thread.id(), id);
-        assert_eq!(thread.value(), 500);
-    }
-
-    #[test]
-    fn roundtrip() {
-        let id = ThreadId::new(Id::new(12345));
+    fn new_and_roundtrip() {
+        let id = ThreadId::new(50);
+        assert_eq!(id.value(), 50);
         let text = id.to_string();
         let parsed: ThreadId = text.parse().unwrap();
         assert_eq!(id, parsed);
