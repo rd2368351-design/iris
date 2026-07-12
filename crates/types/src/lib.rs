@@ -14,6 +14,7 @@ pub mod thread_id;
 pub mod blob_id;
 pub mod domain_id;
 pub mod user_id;
+pub mod session_id;
 
 pub use error::Error;
 pub use id::Id;
@@ -25,3 +26,4 @@ pub use thread_id::ThreadId;
 pub use blob_id::BlobId;
 pub use domain_id::DomainId;
 pub use user_id::UserId;
+pub use session_id::SessionId;
