@@ -4,28 +4,30 @@ use std::str::FromStr;
 
 use crate::Id;
 
-/// Strongly-typed identifier for a stored binary object (blob).
-///
-/// Blobs represent attachment data, message bodies, thumbnails,
-/// S/MIME certificates, and other binary content stored by the mail server.
+/// Strongly-typed identifier for a binary large object (attachment/raw content).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct BlobId(Id);
+pub struct BlobId(pub(crate) Id);
 
 impl BlobId {
-    /// Create a new blob identifier.
-    pub fn new(id: Id) -> Self {
-        Self(id)
+    #[inline]
+    pub const fn new(id: u64) -> Self {
+        Self(Id::new(id))
     }
 
-    /// Returns the wrapped generic identifier.
-    pub fn id(self) -> Id {
+    #[inline]
+    pub const fn id(self) -> Id {
         self.0
     }
 
-    /// Returns the raw numeric value.
-    pub fn value(self) -> u64 {
+    #[inline]
+    pub const fn value(self) -> u64 {
         self.0.value()
+    }
+
+    #[inline]
+    pub const fn is_zero(self) -> bool {
+        self.0.is_zero()
     }
 }
 
@@ -44,14 +46,23 @@ impl FromStr for BlobId {
 }
 
 impl From<Id> for BlobId {
+    #[inline]
     fn from(id: Id) -> Self {
         Self(id)
     }
 }
 
 impl From<BlobId> for Id {
+    #[inline]
     fn from(id: BlobId) -> Self {
         id.0
+    }
+}
+
+impl From<u64> for BlobId {
+    #[inline]
+    fn from(value: u64) -> Self {
+        Self::new(value)
     }
 }
 
@@ -60,17 +71,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn wraps_generic_id() {
-        let id = Id::new(999);
-        let blob = BlobId::new(id);
-
-        assert_eq!(blob.id(), id);
-        assert_eq!(blob.value(), 999);
-    }
-
-    #[test]
-    fn roundtrip() {
-        let id = BlobId::new(Id::new(12345));
+    fn new_and_roundtrip() {
+        let id = BlobId::new(99);
+        assert_eq!(id.value(), 99);
         let text = id.to_string();
         let parsed: BlobId = text.parse().unwrap();
         assert_eq!(id, parsed);
