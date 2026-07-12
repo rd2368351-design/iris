@@ -16,6 +16,7 @@ pub mod domain_id;
 pub mod user_id;
 pub mod session_id;
 pub mod identity_id;
+pub mod tenant_id;
 
 pub use error::Error;
 pub use id::Id;
@@ -29,3 +30,4 @@ pub use domain_id::DomainId;
 pub use user_id::UserId;
 pub use session_id::SessionId;
 pub use identity_id::IdentityId;
+pub use tenant_id::TenantId;
