@@ -44,4 +44,7 @@ pub enum Error {
 
    #[error("invalid priority: {0}")]
    InvalidPriority(String),
+
+   #[error("invalid status: {0}")]
+   InvalidStatus(String),
 }
