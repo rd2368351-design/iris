@@ -6,9 +6,9 @@ use crate::Id;
 
 /// Strongly-typed identifier for a user account.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct AccountId(Id);
 #[serde(transparent)]
 
+pub struct AccountId(Id);
 impl AccountId {
     /// Create a new account identifier.
     pub fn new(id: Id) -> Self {
