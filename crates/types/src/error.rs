@@ -41,4 +41,7 @@ InvalidFolderName(String),
 
 #[error("invalid label name: {0}")]
 InvalidLabelName(String),
+
+#[error("invalid priority: {0}")]
+InvalidPriority(String),
 }
