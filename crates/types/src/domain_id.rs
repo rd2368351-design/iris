@@ -6,28 +6,30 @@ use crate::Id;
 
 /// Strongly-typed identifier for a mail domain.
 ///
-/// Examples:
-/// - example.com
-/// - company.org
-/// - mail.example.net
+/// A domain may host multiple user accounts and mailboxes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct DomainId(Id);
+pub struct DomainId(pub(crate) Id);
 
 impl DomainId {
-    /// Creates a new domain identifier.
-    pub fn new(id: Id) -> Self {
-        Self(id)
+    #[inline]
+    pub const fn new(id: u64) -> Self {
+        Self(Id::new(id))
     }
 
-    /// Returns the wrapped generic identifier.
-    pub fn id(self) -> Id {
+    #[inline]
+    pub const fn id(self) -> Id {
         self.0
     }
 
-    /// Returns the raw numeric value.
-    pub fn value(self) -> u64 {
+    #[inline]
+    pub const fn value(self) -> u64 {
         self.0.value()
+    }
+
+    #[inline]
+    pub const fn is_zero(self) -> bool {
+        self.0.is_zero()
     }
 }
 
@@ -46,14 +48,23 @@ impl FromStr for DomainId {
 }
 
 impl From<Id> for DomainId {
+    #[inline]
     fn from(id: Id) -> Self {
         Self(id)
     }
 }
 
 impl From<DomainId> for Id {
+    #[inline]
     fn from(id: DomainId) -> Self {
         id.0
+    }
+}
+
+impl From<u64> for DomainId {
+    #[inline]
+    fn from(value: u64) -> Self {
+        Self::new(value)
     }
 }
 
@@ -62,17 +73,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn wraps_generic_id() {
-        let id = Id::new(1234);
-        let domain = DomainId::new(id);
-
-        assert_eq!(domain.id(), id);
-        assert_eq!(domain.value(), 1234);
-    }
-
-    #[test]
-    fn roundtrip() {
-        let id = DomainId::new(Id::new(12345));
+    fn new_and_roundtrip() {
+        let id = DomainId::new(5);
+        assert_eq!(id.value(), 5);
         let text = id.to_string();
         let parsed: DomainId = text.parse().unwrap();
         assert_eq!(id, parsed);
