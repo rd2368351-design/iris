@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 /// Unique identifier for a user group.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct GroupId(pub(crate) crate::Id);
 
 impl GroupId {
