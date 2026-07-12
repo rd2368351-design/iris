@@ -6,6 +6,7 @@ use crate::Id;
 
 /// Globally unique identifier for an email message.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct MessageId(pub(crate) Id);
 
 impl MessageId {
