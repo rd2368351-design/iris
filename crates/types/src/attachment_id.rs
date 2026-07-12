@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 /// Unique identifier for an email attachment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct AttachmentId(pub(crate) crate::Id);
 
 impl AttachmentId {
