@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 /// Unique identifier for an uploaded object.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct UploadId(pub(crate) crate::Id);
 
 impl UploadId {
