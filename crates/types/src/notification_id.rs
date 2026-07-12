@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 /// Unique identifier for a notification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct NotificationId(pub(crate) crate::Id);
 
 impl NotificationId {
