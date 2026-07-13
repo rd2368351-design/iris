@@ -1,64 +1,45 @@
-# Wispmail
-
 <p align="center">
-  <img src="docs/assets/logo.svg" width="128" alt="Wispmail Logo">
-</p>
+  <img src="docs/assets/logo.png" alt="Wispmail Logo" width="180">
+</p><h1 align="center">Wispmail</h1><p align="center">
+  <strong>Enterprise-grade, cloud-native, API-first mail server platform written in Go.</strong>
+</p><p align="center">
+  Modern email infrastructure with SMTP, IMAP4rev2, JMAP, POP3, ManageSieve, CalDAV, CardDAV, multi-tenancy, clustering, high availability and enterprise security.
+</p><p align="center">""Build" (https://github.com/YOUR_USERNAME/wispmail/actions/workflows/ci.yml/badge.svg)" (https://github.com/YOUR_USERNAME/wispmail/actions/workflows/ci.yml)
+""Release" (https://img.shields.io/github/v/release/YOUR_USERNAME/wispmail)" (https://github.com/YOUR_USERNAME/wispmail/releases)
+""License" (https://img.shields.io/github/license/YOUR_USERNAME/wispmail)" (LICENSE)
+""Go Version" (https://img.shields.io/github/go-mod/go-version/YOUR_USERNAME/wispmail)" (go.mod)
+""Stars" (https://img.shields.io/github/stars/YOUR_USERNAME/wispmail)" (https://github.com/YOUR_USERNAME/wispmail/stargazers)
+""Forks" (https://img.shields.io/github/forks/YOUR_USERNAME/wispmail)" (https://github.com/YOUR_USERNAME/wispmail/network/members)
+""Issues" (https://img.shields.io/github/issues/YOUR_USERNAME/wispmail)" (https://github.com/YOUR_USERNAME/wispmail/issues)
+""Pull Requests" (https://img.shields.io/github/issues-pr/YOUR_USERNAME/wispmail)" (https://github.com/YOUR_USERNAME/wispmail/pulls)
+""Go Report Card" (https://goreportcard.com/badge/github.com/YOUR_USERNAME/wispmail)" (https://goreportcard.com/report/github.com/YOUR_USERNAME/wispmail)
+""CodeQL" (https://github.com/YOUR_USERNAME/wispmail/actions/workflows/codeql.yml/badge.svg)" (https://github.com/YOUR_USERNAME/wispmail/actions/workflows/codeql.yml)
 
-<p align="center">
-  Enterprise-grade, cloud-native mail server platform written in Go.
-</p>
+</p>---
 
-<p align="center">
+Overview
 
-[![Build Status](https://github.com/USERNAME/wispmail/actions/workflows/ci.yml/badge.svg)](...)
-[![Release](https://img.shields.io/github/v/release/USERNAME/wispmail)](...)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/USERNAME/wispmail)](...)
-[![License](https://img.shields.io/github/license/USERNAME/wispmail)](...)
-[![CodeQL](...)](...)
-[![Coverage](...)](...)
-[![Docker Pulls](...)](...)
-[![GitHub Stars](...)](...)
-[![Issues](...)](...)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](...)
+Wispmail is a modern, enterprise-grade mail server platform built in Go. It is designed for high performance, reliability, security, and scalability while implementing modern email standards. The project follows a modular architecture, making it suitable for personal deployments, businesses, hosting providers, and large-scale enterprise environments.
 
-</p>
+Key Features
 
----
-
-## Overview
-
-Wispmail is an enterprise-grade mail server platform designed for modern infrastructure. It provides SMTP, IMAP, JMAP, POP3, Sieve, CalDAV and CardDAV with a modular architecture, multi-tenancy, high availability and cloud-native deployment.
-
----
-
-## Highlights
-
-- SMTP, IMAP4rev2, POP3, LMTP
-- JMAP
+- SMTP, IMAP4rev2, POP3 and LMTP
+- JMAP API
 - ManageSieve
 - CalDAV & CardDAV
-- Multi-tenant
-- Clustering
-- High Availability
-- DKIM / SPF / DMARC / ARC
-- OpenTelemetry
-- Prometheus
-- REST API
-- Admin API
+- Multi-tenant architecture
+- High Availability & Clustering
+- Horizontal Scaling
+- DKIM, SPF, DMARC and ARC
+- OAuth2, OIDC, LDAP, SAML and MFA
+- REST API & Admin API
 - Plugin System
+- Prometheus Metrics
+- OpenTelemetry
+- Docker, Kubernetes and Helm support
 
 ---
 
-## Architecture
+«Status: 🚧 Active Development
 
-(Architecture Diagram)
-
----
-
-## Quick Start
-
-```bash
-git clone ...
-cd wispmail
-make build
-make run
+Wispmail is under active development and APIs may change before the first stable release.»
