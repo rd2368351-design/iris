@@ -1,0 +1,631 @@
+package app
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"time"
+
+	"github.com/wispmail/wispmail/config"
+	"github.com/wispmail/wispmail/internal/api"
+	"github.com/wispmail/wispmail/internal/smtp"
+	"github.com/wispmail/wispmail/internal/imap"
+	"github.com/wispmail/wispmail/internal/pop3"
+	"github.com/wispmail/wispmail/internal/jmap"
+	"github.com/wispmail/wispmail/internal/sieve"
+	"github.com/wispmail/wispmail/internal/queue"
+	"github.com/wispmail/wispmail/internal/auth/jwt"
+	"github.com/wispmail/wispmail/internal/auth/rbac"
+	"github.com/wispmail/wispmail/internal/auth/apikey"
+	"github.com/wispmail/wispmail/internal/dkim"
+	"github.com/wispmail/wispmail/internal/spf"
+	"github.com/wispmail/wispmail/internal/dmarc"
+	"github.com/wispmail/wispmail/internal/storage/postgres"
+	"github.com/wispmail/wispmail/internal/storage/redis"
+	"github.com/wispmail/wispmail/internal/storage/s3"
+	"github.com/wispmail/wispmail/internal/storage/elasticsearch"
+	"github.com/wispmail/wispmail/pkg/logger"
+	"github.com/wispmail/wispmail/pkg/metrics"
+	"github.com/wispmail/wispmail/pkg/tracing"
+	"github.com/wispmail/wispmail/pkg/graceful"
+	"github.com/wispmail/wispmail/pkg/email"
+)
+
+type App struct {
+	cfg         *config.Config
+	logger      *logger.Logger
+	metrics     *metrics.Metrics
+	tracer      *tracing.Provider
+
+	db          *postgres.Client
+	redis       *redis.Client
+	s3          *s3.Client
+	es          *elasticsearch.Client
+
+	keyManager  *jwt.KeyManager
+	tokenService *jwt.TokenService
+	enforcer    *rbac.Enforcer
+	apiKeyValidator *apikey.Validator
+
+	dkimSigner  *dkim.Signer
+	spfValidator *spf.Validator
+	dmarcValidator *dmarc.Validator
+
+	emailParser *email.Parser
+	emailValidator *email.Validator
+
+	apiServer   *api.Server
+	smtpServer  *smtp.Server
+	imapServer  *imap.Server
+	pop3Server  *pop3.Server
+	jmapServer  *jmap.Server
+	sieveEngine *sieve.Engine
+
+	queueServer *queue.Server
+	worker      *queue.Worker
+
+	shutdown    *graceful.Manager
+}
+
+func New(ctx context.Context, cfg *config.Config) (*App, error) {
+	app := &App{
+		cfg:      cfg,
+		shutdown: graceful.NewManager(cfg.API.ShutdownTimeout),
+	}
+
+	if err := app.initLogger(); err != nil {
+		return nil, fmt.Errorf("failed to initialize logger: %w", err)
+	}
+
+	if err := app.initMetrics(); err != nil {
+		return nil, fmt.Errorf("failed to initialize metrics: %w", err)
+	}
+
+	if err := app.initTracer(ctx); err != nil {
+		return nil, fmt.Errorf("failed to initialize tracer: %w", err)
+	}
+
+	if err := app.initDatabase(ctx); err != nil {
+		return nil, fmt.Errorf("failed to initialize database: %w", err)
+	}
+
+	if err := app.initRedis(ctx); err != nil {
+		return nil, fmt.Errorf("failed to initialize redis: %w", err)
+	}
+
+	if err := app.initS3(ctx); err != nil {
+		return nil, fmt.Errorf("failed to initialize S3: %w", err)
+	}
+
+	if err := app.initElasticsearch(); err != nil {
+		app.logger.Warn("Elasticsearch initialization failed, continuing without search", map[string]any{
+			"error": err.Error(),
+		})
+	}
+
+	app.initAuth()
+	app.initSecurity()
+	app.initEmailTools()
+	app.initDomains()
+
+	if err := app.initQueue(ctx); err != nil {
+		return nil, fmt.Errorf("failed to initialize queue: %w", err)
+	}
+
+	if err := app.initAPIServer(); err != nil {
+		return nil, fmt.Errorf("failed to initialize API server: %w", err)
+	}
+
+	if err := app.initSMTPServer(); err != nil {
+		return nil, fmt.Errorf("failed to initialize SMTP server: %w", err)
+	}
+
+	if err := app.initIMAPServer(); err != nil {
+		app.logger.Warn("IMAP server initialization failed", map[string]any{
+			"error": err.Error(),
+		})
+	}
+
+	if err := app.initPOP3Server(); err != nil {
+		app.logger.Warn("POP3 server initialization failed", map[string]any{
+			"error": err.Error(),
+		})
+	}
+
+	if err := app.initJMAPServer(); err != nil {
+		app.logger.Warn("JMAP server initialization failed", map[string]any{
+			"error": err.Error(),
+		})
+	}
+
+	app.initSieveEngine()
+
+	app.registerShutdownHooks()
+
+	return app, nil
+}
+
+func (a *App) initLogger() error {
+	a.logger = logger.New(logger.Config{
+		Level:  a.cfg.LogLevel,
+		Format: a.cfg.LogFormat,
+	})
+
+	a.logger.Info("logger initialized", map[string]any{
+		"level":  a.cfg.LogLevel,
+		"format": a.cfg.LogFormat,
+	})
+
+	return nil
+}
+
+func (a *App) initMetrics() error {
+	a.metrics = metrics.New()
+
+	a.metrics.RegisterCounter(
+		"wispmail_emails_sent_total",
+		"Total number of emails sent",
+		[]string{"tenant_id", "status"},
+	)
+
+	a.metrics.RegisterCounter(
+		"wispmail_emails_received_total",
+		"Total number of emails received",
+		[]string{"tenant_id"},
+	)
+
+	a.metrics.RegisterGauge(
+		"wispmail_active_connections",
+		"Number of active connections",
+		[]string{"protocol"},
+	)
+
+	a.metrics.RegisterHistogram(
+		"wispmail_request_duration_seconds",
+		"Request duration in seconds",
+		[]string{"method", "path", "status"},
+		[]float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10},
+	)
+
+	a.metrics.RegisterHistogram(
+		"wispmail_email_delivery_seconds",
+		"Email delivery time in seconds",
+		[]string{"tenant_id"},
+		[]float64{.1, .5, 1, 2, 5, 10, 30, 60},
+	)
+
+	a.metrics.RegisterGauge(
+		"wispmail_queue_size",
+		"Current queue size",
+		[]string{"queue"},
+	)
+
+	return nil
+}
+
+func (a *App) initTracer(ctx context.Context) error {
+	tracer, err := tracing.NewProvider(ctx, tracing.Config{
+		ExporterEndpoint: a.cfg.OTEL.ExporterEndpoint,
+		ServiceName:      a.cfg.OTEL.ServiceName,
+		ServiceVersion:   a.cfg.OTEL.ServiceVersion,
+		Enabled:          a.cfg.OTEL.ExporterEndpoint != "",
+		SampleRate:       1.0,
+		BatchTimeout:     5 * time.Second,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to create tracer provider: %w", err)
+	}
+
+	a.tracer = tracer
+
+	a.logger.Info("tracing initialized", map[string]any{
+		"service":  a.cfg.OTEL.ServiceName,
+		"version":  a.cfg.OTEL.ServiceVersion,
+		"endpoint": a.cfg.OTEL.ExporterEndpoint,
+	})
+
+	return nil
+}
+
+func (a *App) initDatabase(ctx context.Context) error {
+	client, err := postgres.NewClient(ctx, a.cfg.Database.URL)
+	if err != nil {
+		return fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	a.db = client
+
+	a.logger.Info("database connected", map[string]any{
+		"max_open_conns": a.cfg.Database.MaxOpenConns,
+		"max_idle_conns": a.cfg.Database.MaxIdleConns,
+	})
+
+	return nil
+}
+
+func (a *App) initRedis(ctx context.Context) error {
+	client, err := redis.NewClient(ctx, a.cfg.Redis.URL)
+	if err != nil {
+		return fmt.Errorf("failed to connect to redis: %w", err)
+	}
+
+	a.redis = client
+
+	a.logger.Info("redis connected", map[string]any{
+		"pool_size": a.cfg.Redis.PoolSize,
+	})
+
+	return nil
+}
+
+func (a *App) initS3(ctx context.Context) error {
+	client, err := s3.NewClient(ctx, s3.S3Config{
+		Endpoint:        a.cfg.S3.Endpoint,
+		Region:          a.cfg.S3.Region,
+		BucketName:      a.cfg.S3.BucketName,
+		AccessKeyID:     a.cfg.S3.AccessKeyID,
+		SecretAccessKey: a.cfg.S3.SecretAccessKey,
+		UseSSL:          a.cfg.S3.UseSSL,
+		ForcePathStyle:  a.cfg.S3.ForcePathStyle,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to create S3 client: %w", err)
+	}
+
+	a.s3 = client
+
+	a.logger.Info("S3 client initialized", map[string]any{
+		"bucket":  a.cfg.S3.BucketName,
+		"region":  a.cfg.S3.Region,
+		"endpoint": a.cfg.S3.Endpoint,
+	})
+
+	return nil
+}
+
+func (a *App) initElasticsearch() error {
+	a.es = elasticsearch.NewClient(elasticsearch.Config{
+		URL:         a.cfg.Elasticsearch.URL,
+		IndexPrefix: a.cfg.Elasticsearch.IndexPrefix,
+	})
+
+	return nil
+}
+
+func (a *App) initAuth() {
+	a.keyManager = jwt.NewKeyManager()
+
+	if _, err := a.keyManager.GenerateKeyPair(); err != nil {
+		a.logger.Error("failed to generate initial JWT key pair", err, nil)
+		os.Exit(1)
+	}
+
+	a.tokenService = jwt.NewTokenService(
+		a.keyManager,
+		a.cfg.JWT.Issuer,
+		a.cfg.JWT.AccessTTL,
+		a.cfg.JWT.RefreshTTL,
+	)
+
+	a.enforcer = rbac.NewEnforcer()
+
+	apiKeyHasher := apikey.NewHasher()
+	a.apiKeyValidator = apikey.NewValidator(apiKeyHasher, nil)
+
+	a.logger.Info("authentication initialized", map[string]any{
+		"issuer":      a.cfg.JWT.Issuer,
+		"access_ttl":  a.cfg.JWT.AccessTTL.String(),
+		"refresh_ttl": a.cfg.JWT.RefreshTTL.String(),
+	})
+}
+
+func (a *App) initSecurity() {
+	var err error
+
+	a.dkimSigner, err = dkim.NewSigner(dkim.DKIMConfig{
+		Selector:       a.cfg.DKIM.Selector,
+		Domain:         a.cfg.DKIM.Domain,
+		PrivateKeyPath: a.cfg.DKIM.PrivateKeyPath,
+	})
+
+	if err != nil {
+		a.logger.Warn("DKIM signer initialization failed", map[string]any{
+			"error": err.Error(),
+		})
+	}
+
+	dnsResolver := spf.NewDefaultDNSResolver()
+	a.spfValidator = spf.NewValidator(dnsResolver)
+
+	dmarcResolver := dmarc.NewDefaultDNSResolver()
+	a.dmarcValidator = dmarc.NewValidator(dmarcResolver)
+
+	a.logger.Info("email security initialized", nil)
+}
+
+func (a *App) initEmailTools() {
+	a.emailParser = &email.Parser{}
+	a.emailValidator = email.NewValidator()
+}
+
+func (a *App) initDomains() {
+	a.logger.Info("domain services initialized", nil)
+}
+
+func (a *App) initQueue(ctx context.Context) error {
+	redisStore := redis.NewQueueStore(a.redis)
+
+	queueServer, err := queue.NewServer(redisStore, queue.ServerConfig{
+		Concurrency: 10,
+		Queues: map[string]int{
+			"critical": 6,
+			"default":  3,
+			"low":      1,
+		},
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to create queue server: %w", err)
+	}
+
+	a.queueServer = queueServer
+
+	worker := queue.NewWorker(redisStore, a.db.Pool, queue.WorkerConfig{
+		Concurrency: 10,
+		Queues: map[string]int{
+			"critical": 6,
+			"default":  3,
+			"low":      1,
+		},
+	})
+
+	worker.RegisterTask("send_email", func(ctx context.Context, payload []byte) error {
+		return nil
+	})
+
+	worker.RegisterTask("dkim_sign", func(ctx context.Context, payload []byte) error {
+		return nil
+	})
+
+	worker.RegisterTask("webhook_deliver", func(ctx context.Context, payload []byte) error {
+		return nil
+	})
+
+	a.worker = worker
+
+	a.logger.Info("queue system initialized", map[string]any{
+		"concurrency": 10,
+		"queues":      []string{"critical", "default", "low"},
+	})
+
+	return nil
+}
+
+func (a *App) initAPIServer() error {
+	apiServer := api.NewServer(api.ServerConfig{
+		Host:           a.cfg.API.Host,
+		Port:           a.cfg.API.Port,
+		ReadTimeout:    a.cfg.API.ReadTimeout,
+		WriteTimeout:   a.cfg.API.WriteTimeout,
+		Metrics:        a.metrics,
+		Logger:         a.logger,
+		TokenService:   a.tokenService,
+		Enforcer:       a.enforcer,
+		DB:             a.db,
+		Redis:          a.redis,
+		S3:             a.s3,
+		DKIMSigner:     a.dkimSigner,
+		EmailParser:    a.emailParser,
+		EmailValidator: a.emailValidator,
+	})
+
+	a.apiServer = apiServer
+
+	a.logger.Info("API server initialized", map[string]any{
+		"host": a.cfg.API.Host,
+		"port": a.cfg.API.Port,
+	})
+
+	return nil
+}
+
+func (a *App) initSMTPServer() error {
+	smtpServer := smtp.NewServer(smtp.Config{
+		Host:           a.cfg.SMTP.Host,
+		Port:           a.cfg.SMTP.Port,
+		TLSCert:        a.cfg.SMTP.TLSCert,
+		TLSKey:         a.cfg.SMTP.TLSKey,
+		MaxMessageSize: a.cfg.SMTP.MaxMessageSize,
+		Logger:         a.logger,
+		Metrics:        a.metrics,
+		EmailParser:    a.emailParser,
+		SPFValidator:   a.spfValidator,
+		DKIMSigner:     a.dkimSigner,
+	})
+
+	a.smtpServer = smtpServer
+
+	a.logger.Info("SMTP server initialized", map[string]any{
+		"host": a.cfg.SMTP.Host,
+		"port": a.cfg.SMTP.Port,
+	})
+
+	return nil
+}
+
+func (a *App) initIMAPServer() error {
+	a.imapServer = imap.NewServer(imap.Config{
+		Host:    a.cfg.IMAP.Host,
+		Port:    a.cfg.IMAP.Port,
+		TLSCert: a.cfg.IMAP.TLSCert,
+		TLSKey:  a.cfg.IMAP.TLSKey,
+		Logger:  a.logger,
+	})
+
+	return nil
+}
+
+func (a *App) initPOP3Server() error {
+	a.pop3Server = pop3.NewServer(pop3.Config{
+		Host:    a.cfg.POP3.Host,
+		Port:    a.cfg.POP3.Port,
+		TLSCert: a.cfg.POP3.TLSCert,
+		TLSKey:  a.cfg.POP3.TLSKey,
+	})
+
+	return nil
+}
+
+func (a *App) initJMAPServer() error {
+	a.jmapServer = jmap.NewServer(jmap.Config{
+		Host:    a.cfg.JMAP.Host,
+		Port:    a.cfg.JMAP.Port,
+		TLSCert: a.cfg.JMAP.TLSCert,
+		TLSKey:  a.cfg.JMAP.TLSKey,
+	})
+
+	return nil
+}
+
+func (a *App) initSieveEngine() {
+	a.sieveEngine = sieve.NewEngine()
+}
+
+func (a *App) registerShutdownHooks() {
+	a.shutdown.Add(func(ctx context.Context) error {
+		a.logger.Info("shutting down API server", nil)
+		return a.apiServer.Shutdown(ctx)
+	})
+
+	a.shutdown.Add(func(ctx context.Context) error {
+		a.logger.Info("shutting down SMTP server", nil)
+		return a.smtpServer.Shutdown(ctx)
+	})
+
+	if a.imapServer != nil {
+		a.shutdown.Add(func(ctx context.Context) error {
+			a.logger.Info("shutting down IMAP server", nil)
+			return a.imapServer.Shutdown(ctx)
+		})
+	}
+
+	if a.pop3Server != nil {
+		a.shutdown.Add(func(ctx context.Context) error {
+			a.logger.Info("shutting down POP3 server", nil)
+			return a.pop3Server.Shutdown(ctx)
+		})
+	}
+
+	if a.jmapServer != nil {
+		a.shutdown.Add(func(ctx context.Context) error {
+			a.logger.Info("shutting down JMAP server", nil)
+			return a.jmapServer.Shutdown(ctx)
+		})
+	}
+
+	a.shutdown.Add(func(ctx context.Context) error {
+		a.logger.Info("shutting down worker", nil)
+		return a.worker.Stop(ctx)
+	})
+
+	a.shutdown.Add(func(ctx context.Context) error {
+		a.logger.Info("shutting down queue server", nil)
+		return a.queueServer.Shutdown(ctx)
+	})
+
+	a.shutdown.Add(func(ctx context.Context) error {
+		a.logger.Info("closing database connection", nil)
+		a.db.Close()
+		return nil
+	})
+
+	a.shutdown.Add(func(ctx context.Context) error {
+		a.logger.Info("closing redis connection", nil)
+		return a.redis.Close()
+	})
+
+	a.shutdown.Add(func(ctx context.Context) error {
+		a.logger.Info("shutting down tracer", nil)
+		return a.tracer.Shutdown(ctx)
+	})
+}
+
+func (a *App) Start(ctx context.Context) error {
+	a.logger.Info("starting Wispmail server", map[string]any{
+		"env": a.cfg.Env,
+	})
+
+	go func() {
+		if err := a.worker.Start(ctx); err != nil {
+			a.logger.Error("worker failed", err, nil)
+		}
+	}()
+
+	go func() {
+		if err := a.queueServer.Start(ctx); err != nil {
+			a.logger.Error("queue server failed", err, nil)
+		}
+	}()
+
+	go func() {
+		a.logger.Info("starting SMTP server", nil)
+		if err := a.smtpServer.Start(); err != nil {
+			a.logger.Error("SMTP server failed", err, nil)
+		}
+	}()
+
+	if a.imapServer != nil {
+		go func() {
+			a.logger.Info("starting IMAP server", nil)
+			if err := a.imapServer.Start(); err != nil {
+				a.logger.Error("IMAP server failed", err, nil)
+			}
+		}()
+	}
+
+	if a.pop3Server != nil {
+		go func() {
+			a.logger.Info("starting POP3 server", nil)
+			if err := a.pop3Server.Start(); err != nil {
+				a.logger.Error("POP3 server failed", err, nil)
+			}
+		}()
+	}
+
+	if a.jmapServer != nil {
+		go func() {
+			a.logger.Info("starting JMAP server", nil)
+			if err := a.jmapServer.Start(); err != nil {
+				a.logger.Error("JMAP server failed", err, nil)
+			}
+		}()
+	}
+
+	a.logger.Info("starting API server", nil)
+	if err := a.apiServer.Start(); err != nil {
+		return fmt.Errorf("API server failed: %w", err)
+	}
+
+	return nil
+}
+
+func (a *App) Stop(ctx context.Context) error {
+	a.logger.Info("stopping Wispmail server", nil)
+	a.shutdown.Shutdown()
+	return nil
+}
+
+func (a *App) Logger() *logger.Logger {
+	return a.logger
+}
+
+func (a *App) Metrics() *metrics.Metrics {
+	return a.metrics
+}
+
+func (a *App) Config() *config.Config {
+	return a.cfg
+}
